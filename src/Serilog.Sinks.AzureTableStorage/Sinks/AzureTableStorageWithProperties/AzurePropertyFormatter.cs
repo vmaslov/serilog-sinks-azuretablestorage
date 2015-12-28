@@ -60,12 +60,12 @@ namespace Serilog.Sinks.AzureTableStorage
 				return new EntityProperty(str.ToString(format, formatProvider));
 			}
 
-			return null;
+            return new EntityProperty((string)null);
 		}
 
 		private static EntityProperty SimplifyScalar(object value)
 		{
-			if (value == null) return null;
+            if (value == null) return new EntityProperty((string)null);
 
 			var valueType = value.GetType();
 
