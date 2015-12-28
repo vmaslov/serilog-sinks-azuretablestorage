@@ -34,15 +34,16 @@ namespace Serilog.Sinks.AzureTableStorage
 		// bring the maximum to 252.
 		const int _maxNumberOfPropertiesPerRow = 252;
 
-		/// <summary>
-		/// Creates a DynamicTableEntity for Azure Storage, given a Serilog <see cref="LogEvent"/>.Properties
-		/// are stored as separate columns.
-		/// </summary>
-		/// <param name="logEvent">The event to log</param>
-		/// <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
-		/// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
-		/// <returns></returns>
-		public static DynamicTableEntity CreateEntityWithProperties(LogEvent logEvent, IFormatProvider formatProvider, string additionalRowKeyPostfix)
+	    /// <summary>
+	    /// Creates a DynamicTableEntity for Azure Storage, given a Serilog <see cref="LogEvent"/>.Properties
+	    /// are stored as separate columns.
+	    /// </summary>
+	    /// <param name="logEvent">The event to log</param>
+	    /// <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
+	    /// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
+	    /// <param name="saveMessageFields"></param>
+	    /// <returns></returns>
+	    public static DynamicTableEntity CreateEntityWithProperties(LogEvent logEvent, IFormatProvider formatProvider, string additionalRowKeyPostfix, bool saveMessageFields = true)
 		{
 			var tableEntity = new DynamicTableEntity();
 
@@ -52,9 +53,13 @@ namespace Serilog.Sinks.AzureTableStorage
 
 			var dynamicProperties = tableEntity.Properties;
 
-			dynamicProperties.Add("MessageTemplate", new EntityProperty(logEvent.MessageTemplate.Text));
-			dynamicProperties.Add("Level", new EntityProperty(logEvent.Level.ToString()));
-			dynamicProperties.Add("RenderedMessage", new EntityProperty(logEvent.RenderMessage(formatProvider)));
+	        if (saveMessageFields)
+	        {
+	            dynamicProperties.Add("MessageTemplate", new EntityProperty(logEvent.MessageTemplate.Text));
+                dynamicProperties.Add("RenderedMessage", new EntityProperty(logEvent.RenderMessage(formatProvider)));
+	        }
+	        dynamicProperties.Add("Level", new EntityProperty(logEvent.Level.ToString()));
+			
 
 			if (logEvent.Exception != null)
 			{

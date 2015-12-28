@@ -31,20 +31,22 @@ namespace Serilog.Sinks.AzureTableStorage
 	public class AzureBatchingTableStorageWithPropertiesSink : PeriodicBatchingSink
 	{
 		private readonly IFormatProvider _formatProvider;
-		private readonly CloudTable _table;
+	    private readonly bool _saveMessageFields;
+	    private readonly CloudTable _table;
 		private readonly string _additionalRowKeyPostfix;
 		private const int _maxAzureOperationsPerBatch = 100;
 
-		/// <summary>
-		/// Construct a sink that saves logs to the specified storage account.
-		/// </summary>
-		/// <param name="storageAccount">The Cloud Storage Account to use to insert the log entries to.</param>
-		/// <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
-		/// <param name="batchSizeLimit"></param>
-		/// <param name="period"></param>
-		/// <param name="storageTableName">Table name that log entries will be written to. Note: Optional, setting this may impact performance</param>
-		/// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
-		public AzureBatchingTableStorageWithPropertiesSink(CloudStorageAccount storageAccount, IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period, string storageTableName = null, string additionalRowKeyPostfix = null)
+	    /// <summary>
+	    /// Construct a sink that saves logs to the specified storage account.
+	    /// </summary>
+	    /// <param name="storageAccount">The Cloud Storage Account to use to insert the log entries to.</param>
+	    /// <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
+	    /// <param name="batchSizeLimit"></param>
+	    /// <param name="period"></param>
+	    /// <param name="storageTableName">Table name that log entries will be written to. Note: Optional, setting this may impact performance</param>
+	    /// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
+	    /// <param name="saveMessageFields"></param>
+	    public AzureBatchingTableStorageWithPropertiesSink(CloudStorageAccount storageAccount, IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period, string storageTableName = null, string additionalRowKeyPostfix = null, bool saveMessageFields = true)
 			: base(batchSizeLimit, period)
 		{
 			var tableClient = storageAccount.CreateCloudTableClient();
@@ -58,8 +60,9 @@ namespace Serilog.Sinks.AzureTableStorage
 			_table.CreateIfNotExists();
 
 			_formatProvider = formatProvider;
+	        this._saveMessageFields = saveMessageFields;
 
-			if (additionalRowKeyPostfix != null)
+	        if (additionalRowKeyPostfix != null)
 			{
 				_additionalRowKeyPostfix = AzureTableStorageEntityFactory.GetValidStringForTableKey(additionalRowKeyPostfix);
 			}
@@ -79,7 +82,7 @@ namespace Serilog.Sinks.AzureTableStorage
 
 			foreach (var logEvent in events)
 			{
-				var tableEntity = AzureTableStorageEntityFactory.CreateEntityWithProperties(logEvent, _formatProvider, _additionalRowKeyPostfix);
+				var tableEntity = AzureTableStorageEntityFactory.CreateEntityWithProperties(logEvent, _formatProvider, _additionalRowKeyPostfix, _saveMessageFields);
 
 				// If partition changed, store the new and force an execution
 				if (lastPartitionKey != tableEntity.PartitionKey)

@@ -31,17 +31,19 @@ namespace Serilog.Sinks.AzureTableStorage
 	public class AzureTableStorageWithPropertiesSink : ILogEventSink
 	{
 		private readonly IFormatProvider _formatProvider;
-		private readonly CloudTable _table;
+	    private readonly bool _saveMessageFields;
+	    private readonly CloudTable _table;
 		private readonly string _additionalRowKeyPostfix;
 
-        /// <summary>
-        /// Construct a sink that saves logs to the specified storage account.
-        /// </summary>
-        /// <param name="storageAccount">The Cloud Storage Account to use to insert the log entries to.</param>
-        /// <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
-        /// <param name="storageTableName">Table name that log entries will be written to. Note: Optional, setting this may impact performance</param>
-		/// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
-		public AzureTableStorageWithPropertiesSink(CloudStorageAccount storageAccount, IFormatProvider formatProvider, string storageTableName = null, string additionalRowKeyPostfix = null)
+	    /// <summary>
+	    /// Construct a sink that saves logs to the specified storage account.
+	    /// </summary>
+	    /// <param name="storageAccount">The Cloud Storage Account to use to insert the log entries to.</param>
+	    /// <param name="formatProvider">Supplies culture-specific formatting information, or null.</param>
+	    /// <param name="storageTableName">Table name that log entries will be written to. Note: Optional, setting this may impact performance</param>
+	    /// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
+	    /// <param name="saveMessageFields"></param>
+	    public AzureTableStorageWithPropertiesSink(CloudStorageAccount storageAccount, IFormatProvider formatProvider, string storageTableName = null, string additionalRowKeyPostfix = null, bool saveMessageFields = true)
         {
 			var tableClient = storageAccount.CreateCloudTableClient();
 
@@ -54,8 +56,9 @@ namespace Serilog.Sinks.AzureTableStorage
 			_table.CreateIfNotExists();
 
 			_formatProvider = formatProvider;
+	        this._saveMessageFields = saveMessageFields;
 
-			if (additionalRowKeyPostfix != null)
+	        if (additionalRowKeyPostfix != null)
 			{
 				_additionalRowKeyPostfix = AzureTableStorageEntityFactory.GetValidStringForTableKey(additionalRowKeyPostfix);
 			}
@@ -67,7 +70,7 @@ namespace Serilog.Sinks.AzureTableStorage
 		/// <param name="logEvent">The log event to write.</param>
 		public void Emit(LogEvent logEvent)
 		{
-			_table.Execute(TableOperation.Insert(AzureTableStorageEntityFactory.CreateEntityWithProperties(logEvent, _formatProvider, _additionalRowKeyPostfix)));
+			_table.Execute(TableOperation.Insert(AzureTableStorageEntityFactory.CreateEntityWithProperties(logEvent, _formatProvider, _additionalRowKeyPostfix, _saveMessageFields)));
 		}
 	}
 }
