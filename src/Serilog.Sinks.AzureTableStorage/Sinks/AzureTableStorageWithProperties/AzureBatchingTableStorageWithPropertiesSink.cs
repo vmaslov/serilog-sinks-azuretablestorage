@@ -31,10 +31,15 @@ namespace Serilog.Sinks.AzureTableStorage
 	public class AzureBatchingTableStorageWithPropertiesSink : PeriodicBatchingSink
 	{
 		private readonly IFormatProvider _formatProvider;
+	    private readonly string _storageTableNameBase;
 	    private readonly bool _saveMessageFields;
-	    private readonly CloudTable _table;
+	    private readonly string tableSuffix;
+	    private CloudTable _table;
 		private readonly string _additionalRowKeyPostfix;
-		private const int _maxAzureOperationsPerBatch = 100;
+	    private readonly CloudTableClient tableClient;
+	    private const int _maxAzureOperationsPerBatch = 100;
+        private readonly object lockObject = new object();
+        private string tableDateString = null;
 
 	    /// <summary>
 	    /// Construct a sink that saves logs to the specified storage account.
@@ -46,29 +51,49 @@ namespace Serilog.Sinks.AzureTableStorage
 	    /// <param name="storageTableName">Table name that log entries will be written to. Note: Optional, setting this may impact performance</param>
 	    /// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
 	    /// <param name="saveMessageFields"></param>
-	    public AzureBatchingTableStorageWithPropertiesSink(CloudStorageAccount storageAccount, IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period, string storageTableName = null, string additionalRowKeyPostfix = null, bool saveMessageFields = true)
+	    /// <param name="tableSuffix"></param>
+	    public AzureBatchingTableStorageWithPropertiesSink(CloudStorageAccount storageAccount, IFormatProvider formatProvider, int batchSizeLimit, TimeSpan period, string storageTableName = null, string additionalRowKeyPostfix = null, bool saveMessageFields = true, string tableSuffix = "yyyyMMdd")
 			: base(batchSizeLimit, period)
 		{
-			var tableClient = storageAccount.CreateCloudTableClient();
+			tableClient = storageAccount.CreateCloudTableClient();
 
 			if (string.IsNullOrEmpty(storageTableName))
 			{
 				storageTableName = "LogEventEntity";
 			}
 
-			_table = tableClient.GetTableReference(storageTableName);
-			_table.CreateIfNotExists();
-
 			_formatProvider = formatProvider;
+	        this._storageTableNameBase = storageTableName;
 	        this._saveMessageFields = saveMessageFields;
+	        this.tableSuffix = tableSuffix;
 
 	        if (additionalRowKeyPostfix != null)
 			{
 				_additionalRowKeyPostfix = AzureTableStorageEntityFactory.GetValidStringForTableKey(additionalRowKeyPostfix);
 			}
-		}
+		}	    
 
-		/// <summary>
+	    private CloudTable CurrentTable
+	    {
+	        get
+	        {
+	            lock (lockObject)
+	            {
+	                string currentTimeString = DateTimeOffset.UtcNow.ToString(tableSuffix);
+                    if (tableDateString != currentTimeString || _table == null)
+	                {
+                        tableDateString = currentTimeString;
+	                    string tableName = _storageTableNameBase + currentTimeString;
+                        _table = tableClient.GetTableReference(tableName);
+                        _table.CreateIfNotExists();
+	                }
+
+	                return _table;    
+	            }
+	        }
+	    }
+
+	    /// <summary>
 		/// Emit a batch of log events, running to completion synchronously.
 		/// </summary>
 		/// <param name="events">The events to emit.</param>
@@ -99,7 +124,7 @@ namespace Serilog.Sinks.AzureTableStorage
 					// If there is an operation currently in use, execute it
 					if (operation != null)
 					{
-						_table.ExecuteBatch(operation);
+						CurrentTable.ExecuteBatch(operation);
 					}
 
 					// Create a new batch operation and zero count
@@ -114,7 +139,7 @@ namespace Serilog.Sinks.AzureTableStorage
 			}
 
 			// Execute last batch
-			_table.ExecuteBatch(operation);
+			CurrentTable.ExecuteBatch(operation);
 		}
 	}
 }
