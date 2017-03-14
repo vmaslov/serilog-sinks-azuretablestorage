@@ -1,11 +1,11 @@
 ﻿// Copyright 2014 Serilog Contributors
-//
+// 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//
+// 
 //     http://www.apache.org/licenses/LICENSE-2.0
-//
+// 
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -54,6 +54,7 @@ namespace Serilog
         /// <param name="keyGenerator">Generates the PartitionKey and the RowKey</param>
         /// <param name="propertyColumns">Specific properties to be written to columns. By default, all properties will be written to columns.</param>
         /// <param name="saveMessageFields">Save additional (unnecessary) fields - MessageTemplate and RenderedMessage.</param>
+	    /// <param name="tableSuffix"></param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
         public static LoggerConfiguration AzureTableStorageWithProperties(
@@ -68,7 +69,8 @@ namespace Serilog
             string additionalRowKeyPostfix = null,
             IKeyGenerator keyGenerator = null,
             string[] propertyColumns = null,
-            bool saveMessageFields = true)
+            bool saveMessageFields = true,
+            string tableSuffix = "yyyyMMdd")
         {
             if (loggerConfiguration == null) throw new ArgumentNullException("loggerConfiguration");
             if (storageAccount == null) throw new ArgumentNullException("storageAccount");
@@ -79,7 +81,7 @@ namespace Serilog
             {
                 sink = writeInBatches
                     ? (ILogEventSink)
-                    new AzureBatchingTableStorageWithPropertiesSink(storageAccount, formatProvider, batchPostingLimit ?? DefaultBatchPostingLimit, period ?? DefaultPeriod, storageTableName, additionalRowKeyPostfix, keyGenerator, propertyColumns, saveMessageFields)
+                    new AzureBatchingTableStorageWithPropertiesSink(storageAccount, formatProvider, batchPostingLimit ?? DefaultBatchPostingLimit, period ?? DefaultPeriod, storageTableName, additionalRowKeyPostfix, keyGenerator, propertyColumns, saveMessageFields, tableSuffix)
                     : new AzureTableStorageWithPropertiesSink(storageAccount, formatProvider, storageTableName, additionalRowKeyPostfix, keyGenerator, propertyColumns, saveMessageFields);
             }
             catch (Exception ex)
@@ -107,6 +109,7 @@ namespace Serilog
         /// <param name="keyGenerator">Generates the PartitionKey and the RowKey</param>
         /// <param name="propertyColumns">Specific properties to be written to columns. By default, all properties will be written to columns.</param>
         /// <param name="saveMessageFields">Save additional (unnecessary) fields - MessageTemplate and RenderedMessage.</param>
+	    /// <param name="tableSuffix"></param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         /// <exception cref="ArgumentNullException">A required parameter is null.</exception>
         public static LoggerConfiguration AzureTableStorageWithProperties(
@@ -121,7 +124,8 @@ namespace Serilog
             string additionalRowKeyPostfix = null,
             IKeyGenerator keyGenerator = null, 
             string[] propertyColumns = null,
-            bool saveMessageFields = true)
+            bool saveMessageFields = true,
+            string tableSuffix = "yyyyMMdd")
         {
             if (loggerConfiguration == null) throw new ArgumentNullException("loggerConfiguration");
             if (String.IsNullOrEmpty(connectionString)) throw new ArgumentNullException("connectionString");
@@ -129,7 +133,7 @@ namespace Serilog
             try
             {
                 var storageAccount = CloudStorageAccount.Parse(connectionString);
-                return AzureTableStorageWithProperties(loggerConfiguration, storageAccount, restrictedToMinimumLevel, formatProvider, storageTableName, writeInBatches, period, batchPostingLimit, additionalRowKeyPostfix, keyGenerator, propertyColumns, saveMessageFields);
+                return AzureTableStorageWithProperties(loggerConfiguration, storageAccount, restrictedToMinimumLevel, formatProvider, storageTableName, writeInBatches, period, batchPostingLimit, additionalRowKeyPostfix, keyGenerator, propertyColumns, saveMessageFields, tableSuffix);
             }
             catch (Exception ex)
             {

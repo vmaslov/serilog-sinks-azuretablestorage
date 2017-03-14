@@ -31,13 +31,18 @@ namespace Serilog.Sinks.AzureTableStorage
     public class AzureBatchingTableStorageWithPropertiesSink : PeriodicBatchingSink
     {
         private readonly int _waitTimeoutMilliseconds = Timeout.Infinite;
+        private readonly object _lockObject = new object();
+        private readonly CloudTableClient _tableClient;
+        private readonly string _storageTableName;
         private readonly IFormatProvider _formatProvider;
-        private readonly CloudTable _table;
         private readonly string _additionalRowKeyPostfix;
         private readonly string[] _propertyColumns;
         private readonly bool _saveMessageFields;
+        private readonly string _tableSuffix;
         private const int _maxAzureOperationsPerBatch = 100;
         private readonly IKeyGenerator _keyGenerator;
+        private string _previousTableNameSuffix;
+        private CloudTable _currentTable;
 
         /// <summary>
         /// Construct a sink that saves logs to the specified storage account.
@@ -51,6 +56,7 @@ namespace Serilog.Sinks.AzureTableStorage
         /// <param name="keyGenerator">Generates the PartitionKey and the RowKey</param>
         /// <param name="propertyColumns">Specific properties to be written to columns. By default, all properties will be written to columns.</param>
         /// <param name="saveMessageFields">Save additional (unnecessary) fields - MessageTemplate and RenderedMessage.</param>
+        /// <param name="tableSuffix">Azure table name suffix (date format).</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         public AzureBatchingTableStorageWithPropertiesSink(CloudStorageAccount storageAccount,
             IFormatProvider formatProvider,
@@ -60,24 +66,50 @@ namespace Serilog.Sinks.AzureTableStorage
             string additionalRowKeyPostfix = null,
             IKeyGenerator keyGenerator = null, 
             string[] propertyColumns = null,
-            bool saveMessageFields = true)
+            bool saveMessageFields = true,
+            string tableSuffix = "yyyyMMdd")
             : base(batchSizeLimit, period)
         {
-            var tableClient = storageAccount.CreateCloudTableClient();
+            _tableClient = storageAccount.CreateCloudTableClient();
 
             if (string.IsNullOrEmpty(storageTableName))
             {
                 storageTableName = "LogEventEntity";
             }
 
-            _table = tableClient.GetTableReference(storageTableName);
-            _table.CreateIfNotExistsAsync().SyncContextSafeWait(_waitTimeoutMilliseconds);
+            _storageTableName = storageTableName;
+
+            /*_table = _tableClient.GetTableReference(storageTableName);
+            _table.CreateIfNotExistsAsync().SyncContextSafeWait(_waitTimeoutMilliseconds);*/
 
             _formatProvider = formatProvider;
             _additionalRowKeyPostfix = additionalRowKeyPostfix;
             _propertyColumns = propertyColumns;
             _saveMessageFields = saveMessageFields;
+            _tableSuffix = tableSuffix;
             _keyGenerator = keyGenerator ?? new PropertiesKeyGenerator();
+        }
+
+        private CloudTable CurrentTable
+        {
+            get
+            {
+                lock (_lockObject)
+                {
+                    string tableNameSuffix = DateTimeOffset.UtcNow.ToString(_tableSuffix);
+                    if (_previousTableNameSuffix != tableNameSuffix
+                        || _currentTable == null)
+                    {
+                        _previousTableNameSuffix = tableNameSuffix;
+
+                        string tableName = _storageTableName + tableNameSuffix;
+                        _currentTable = _tableClient.GetTableReference(tableName);
+                        _currentTable.CreateIfNotExistsAsync().SyncContextSafeWait(_waitTimeoutMilliseconds);
+                    }
+                }
+
+                return _currentTable;
+            }
         }
 
         protected override async Task EmitBatchAsync(IEnumerable<LogEvent> events)
@@ -105,7 +137,7 @@ namespace Serilog.Sinks.AzureTableStorage
                     // If there is an operation currently in use, execute it
                     if (operation != null)
                     {
-                        await _table.ExecuteBatchAsync(operation);
+                        await CurrentTable.ExecuteBatchAsync(operation);
                     }
 
                     // Create a new batch operation and zero count
@@ -120,7 +152,7 @@ namespace Serilog.Sinks.AzureTableStorage
             }
 
             // Execute last batch
-            await _table.ExecuteBatchAsync(operation);
+            await CurrentTable.ExecuteBatchAsync(operation);
         }
     }
 }
