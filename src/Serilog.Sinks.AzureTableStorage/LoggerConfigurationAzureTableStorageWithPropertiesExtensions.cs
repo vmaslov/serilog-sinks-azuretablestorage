@@ -23,6 +23,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+
+//in test1 branch
 namespace Serilog
 {
 	/// <summary>
