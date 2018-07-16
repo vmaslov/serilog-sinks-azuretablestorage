@@ -35,6 +35,7 @@ namespace Serilog.Sinks.AzureTableStorage
         private readonly CloudTable _table;
         private readonly string _additionalRowKeyPostfix;
         private readonly string[] _propertyColumns;
+        private readonly bool _saveMessageFields;
         private const int _maxAzureOperationsPerBatch = 100;
         private readonly IKeyGenerator _keyGenerator;
 
@@ -49,6 +50,7 @@ namespace Serilog.Sinks.AzureTableStorage
         /// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
         /// <param name="keyGenerator">Generates the PartitionKey and the RowKey</param>
         /// <param name="propertyColumns">Specific properties to be written to columns. By default, all properties will be written to columns.</param>
+        /// <param name="saveMessageFields">Save additional (unnecessary) fields - MessageTemplate and RenderedMessage.</param>
         /// <returns>Logger configuration, allowing configuration to continue.</returns>
         public AzureBatchingTableStorageWithPropertiesSink(CloudStorageAccount storageAccount,
             IFormatProvider formatProvider,
@@ -57,7 +59,8 @@ namespace Serilog.Sinks.AzureTableStorage
             string storageTableName = null,
             string additionalRowKeyPostfix = null,
             IKeyGenerator keyGenerator = null, 
-            string[] propertyColumns = null)
+            string[] propertyColumns = null,
+            bool saveMessageFields = true)
             : base(batchSizeLimit, period)
         {
             var tableClient = storageAccount.CreateCloudTableClient();
@@ -73,6 +76,7 @@ namespace Serilog.Sinks.AzureTableStorage
             _formatProvider = formatProvider;
             _additionalRowKeyPostfix = additionalRowKeyPostfix;
             _propertyColumns = propertyColumns;
+            _saveMessageFields = saveMessageFields;
             _keyGenerator = keyGenerator ?? new PropertiesKeyGenerator();
         }
 
@@ -84,7 +88,7 @@ namespace Serilog.Sinks.AzureTableStorage
 
             foreach (var logEvent in events)
             {
-                var tableEntity = AzureTableStorageEntityFactory.CreateEntityWithProperties(logEvent, _formatProvider, _additionalRowKeyPostfix, _keyGenerator, _propertyColumns);
+                var tableEntity = AzureTableStorageEntityFactory.CreateEntityWithProperties(logEvent, _formatProvider, _additionalRowKeyPostfix, _keyGenerator, _propertyColumns, _saveMessageFields);
 
                 // If partition changed, store the new and force an execution
                 if (lastPartitionKey != tableEntity.PartitionKey)

@@ -40,8 +40,9 @@ namespace Serilog.Sinks.AzureTableStorage
         /// <param name="additionalRowKeyPostfix">Additional postfix string that will be appended to row keys</param>
         /// <param name="keyGenerator">The IKeyGenerator for the PartitionKey and RowKey</param>
         /// <param name="propertyColumns">Specific properties to be written to columns. By default, all properties will be written to columns.</param>
+        /// <param name="saveMessageFields">Save additional (unnecessary) fields - MessageTemplate and RenderedMessage.</param>
         /// <returns></returns>
-        public static DynamicTableEntity CreateEntityWithProperties(LogEvent logEvent, IFormatProvider formatProvider, string additionalRowKeyPostfix, IKeyGenerator keyGenerator, string[] propertyColumns = null)
+        public static DynamicTableEntity CreateEntityWithProperties(LogEvent logEvent, IFormatProvider formatProvider, string additionalRowKeyPostfix, IKeyGenerator keyGenerator, string[] propertyColumns = null, bool saveMessageFields = true)
         {
             var tableEntity = new DynamicTableEntity
             {
@@ -52,9 +53,13 @@ namespace Serilog.Sinks.AzureTableStorage
 
             var dynamicProperties = tableEntity.Properties;
 
-            dynamicProperties.Add("MessageTemplate", new EntityProperty(logEvent.MessageTemplate.Text));
+            if (saveMessageFields)
+            {
+                dynamicProperties.Add("MessageTemplate", new EntityProperty(logEvent.MessageTemplate.Text));
+                dynamicProperties.Add("RenderedMessage", new EntityProperty(logEvent.RenderMessage(formatProvider)));
+            }
+
             dynamicProperties.Add("Level", new EntityProperty(logEvent.Level.ToString()));
-            dynamicProperties.Add("RenderedMessage", new EntityProperty(logEvent.RenderMessage(formatProvider)));
 
             if (logEvent.Exception != null)
             {
